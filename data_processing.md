@@ -88,7 +88,7 @@ species$genus[match(c("NL", "DS", "PF"), species$species_id)]
 
 Note that whereas `x %in% y` returns a logical vector indicating if each element of *x* can be found in *y*, `match(x, y)` returns the index of the first occurrence of each element of `x` within `y`.
 
-**Q.**: What would be the problem with writing `species$genus[species$species_id %in% c("NL", "DS", "PF")` in the last example? (It would have returned the same three names, but in the order in which they appear in *species*, rather than the order of the codes we provided.)
+**Q.**: What would be the problem with writing `species$genus[species$species_id %in% c("NL", "DS", "PF")]` in the last example? (It would have returned the same three names, but in the order in which they appear in *species*, rather than the order of the codes we provided.)
 
 Matrix operations
 -----------------
