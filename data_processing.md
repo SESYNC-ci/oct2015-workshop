@@ -1,9 +1,10 @@
 Data processing in R
 ====================
 
-[Intro...]
+This tutorial introduces some of the functions provided by R to efficiently organize, transform and summarize data contained in each of its basic data structures: vectors, matrices, lists and data frames.
 
-### Example data
+Example data
+------------
 
 For this tutorial, we will use example data from the [Portal teaching dataset](http://github.com/weecology/portal-teachingdb), which is derived from a long-term monitoring dataset of a desert ecosystem near Portal, AZ. We first load the relevant files that were previously saved in the SESYNC *public-data* shared folder:
 
@@ -22,7 +23,8 @@ head(surveys)
     ## 5         5     7  16 1977       3         DM   M              35     NA
     ## 6         6     7  16 1977       1         PF   M              14     NA
 
-### Vector operations
+Vector operations
+-----------------
 
 An important feature of R is that most base functions naturally work on arbitrary long vectors. For example, arithmetic operators, logical operators, and math functions like `log()`, `cos()`, etc. operate in parallel on each element of their input vector(s).
 
@@ -57,7 +59,8 @@ head(cbind(plots, new_plot_id))
 
 Not all vector functions operate in parallel. Summary functions such as `sum`, `mean`, `min` and `max` take a vector input and return a single number (but note the existence of `pmin` and `pmax`, parallel version of `min` and `max`). The logical summary functions [`any`, `all`] return a single TRUE/FALSE value based on whether [any, all] of the input vector's elements are TRUE.
 
-### Multiple comparisons with *%in%* and *match*
+Multiple comparisons with *%in%* and *match*
+--------------------------------------------
 
 Using logical subsetting, we can extract all observations of a particular species from the *surveys* data frame, e.g. `surveys[surveys$species_id == "NL", ]`. What if we want to extract all rows corresponding to a specific subset of species? We use the `%in%` operator:
 
@@ -87,7 +90,8 @@ Note that whereas `x %in% y` returns a logical vector indicating if each element
 
 **Q.**: What would be the problem with writing `species$genus[species$species_id %in% c("NL", "DS", "PF")` in the last example? (It would have returned the same three names, but in the order in which they appear in *species*, rather than the order of the codes we provided.)
 
-### Matrix operations
+Matrix operations
+-----------------
 
 We first use the `table` function to produce a contingency table of the number of observations of each species in each plot:
 
@@ -147,7 +151,7 @@ names(which(major_plot))
 
 **Notes**:
 
--   For a single-line function that is only used once, we can streamline the above code by creating an anonymous (unnamed) function directly in the `apply` call: `apply(counts_prop, 1, function(x) any(x > 0.5))`.
+-   For a single line function that is only used once, we can streamline the above code by creating an anonymous (unnamed) function directly in the `apply` call: `apply(counts_prop, 1, function(x) any(x > 0.5))`.
 -   `scale` is a useful alternative to `sweep` when you want to center (subtract a value) and scale (divide by a value) each column of a matrix. By default, `scale` substracts the mean and divides by the standard deviation of each column.
 -   Although we focused on matrices, `apply` and `sweep` also work with arrays of three or more dimensions.
 
@@ -155,3 +159,13 @@ names(which(major_plot))
 
 -   What is the minimum and maximum number of species found in a single plot?
 -   Which species are present in five different plots or less?
+
+Data frame operations
+---------------------
+
+...[order, merge, aggregate, ?]
+
+Additional resources
+--------------------
+
+-   The [tidyr](https://cran.r-project.org/web/packages/tidyr/index.html) and [dplyr](https://cran.r-project.org/web/packages/dplyr/index.html) packages provide functions that streamline many common processing steps for data frames (e.g. reshape, sort, aggregate, join). Also check out our [tutorial](https://github.com/SESYNC-ci/CSI-2015/blob/master/Lessons/R/tidyr_dplyr.md) that focuses on these two packages.

@@ -1,0 +1,141 @@
+---
+title: "Importing and cleaning raw data"
+author: "Philippe Marchand"
+date: "10/27/2015"
+output: 
+  md_document:
+    variant: markdown_github
+---
+
+# Importing and cleaning raw data
+
+In this lesson, we will see how to program R to organize "messy" data from an Excel spreadsheet and organize it in a data frame. By messy data, we generally mean input data that is less structured than the format we require for analysis.
+
+### Example data
+
+We will again use the Portal teaching database as an example. Our goal for this exercise is to take new survey data from an Excel file and append it to the *surveys* data frame.
+```{r}
+surveys <- read.csv("/nfs/public-data/portal-teachingdb/surveys.csv", 
+                    na.strings = "", stringsAsFactors = FALSE)
+head(surveys)
+```
+
+Using the **readxl** package, we import the first sheet of the Excel file into R:
+```{r}
+library(readxl)
+messy_data <- read_excel("/nfs/public-data/portal-teachingdb/survey_data_spreadsheet_messy.xls",
+                         sheet = 1, col_names = FALSE)
+```
+
+By inspecting the resulting data frame, we can identify several ways in which the data needs cleaning:
+
+* it is separated in multiple tables (one by species);
+* the weights are not reported consistently;
+* the dates were converted to integers due to Excel's storage format.
+
+This particular spreadsheet is small enough that it may be faster to simply reformat it in Excel. However, in real applications there are several benefits to organizing data cleaning steps in a script:
+
+* multiple raw data files may need to be cleaned in the same way;
+* the raw data could originate from the web, and different users can share their processing scripts;
+* humans are more likely to insert random errors (e.g. typos) when performing repetitive tasks on a dataset; the output of a script is predictable and any bugs can be traced and corrected.
+
+### Searching and extracting text
+
+Let's start by finding where the "Species: __" headers are located.
+```{r}
+messy_data <- as.matrix(messy_data)
+colnames(messy_data) <- NULL
+header_ind <- grep("Species", messy_data)
+header_ind <- arrayInd(header_ind, dim(messy_data))
+header_ind
+```
+The function `grep(pattern, x)` returns the indices in *x* where a certain text *pattern* can be found. We convert *messy_data* to a matrix to obtain the indices of cells. (When applied to a data frame, `grep` only provides the column indices, because data frames are stored by R as lists of columns.) The `grep` function returns cell indices `c(5, 113, 221)` and `arrayInd` converts them into a matrix of row and column numbers.
+
+We now extract the species ID, which corresponds to the last two characters in the header cell. We use the `nchar` function to get the number of characters in a string and the `substr(s, i, j)` function which returns a substring of *s* between positions *i* and *j*. 
+```{r}
+header_text <- messy_data[header_ind] # Get the content of the header cells
+spc_ids <- substr(header_text, nchar(header_text) - 1, nchar(header_text))
+```
+
+### Storing matrices in a list
+
+Let's assume we know that each species table has four columns corresponding to the date collected, plot ID, sex and weight; and that the table has ended when we reach a row with four empty cells. Given the position of the header and the data matrix *dmat*, this function returns the data table (minus column headers) as a matrix:
+```{r}
+# This function extracts a four column data table from the matrix dmat
+# hdr_idx is a vector of 2 integers (row and column of Species header)
+get_spc_table <- function(hdr_idx, dmat) {
+    tabl <- dmat[hdr_idx[1]:nrow(dmat), hdr_idx[2] + 0:3]
+    empty_rows <- which(apply(tabl, 1, function(x) all(is.na(x))))
+    tabl <- tabl[3:(empty_rows[1] - 1), ]
+}
+```
+
+We now `apply` this function to each row of our `header_ind` matrix to extract the table for that species. The output in this case is a list of matrices: 
+```{r}
+tbl_list <- apply(header_ind, 1, get_spc_table, dmat = messy_data)
+str(tbl_list)
+```
+
+*Note*: If the function called by `apply` has multiple arguments, the rows (or columns) of the matrix are passed to the first argument (in this case, *header_ind*). Other arguments to the function can be specified as additional arguments to `apply`, as we do for *dmat*. While naming the extra argument was not necessary in this case, it makes the code much clearer.
+
+Before we can combine these matrices, we need to add the species ID as a separate data column. We can do this by appending a column (with `cbind`) to each matrix in `tbl_list` and fill this column with the corresponding element of `species_id`. One way to do this is via the `lapply` function, which is very much like `apply` for one-dimensional data: it takes a list or vector, applies the function to each element, and returns a list of results. 
+```{r}
+tbl_list2 <- lapply(1:length(spc_ids), 
+                    function(i) cbind(tbl_list[[i]], spc_ids[i]))
+head(tbl_list2[[1]])
+```
+If you have some programming experience, you may find this particular application of `lapply` (going over a vector of indices) to be very similar to a `for` loop. The `lapply` approach is not only faster and more compact, it also highlights the parallel nature of the problem. In fact, many R packages that allow users to run code in parallel across multiple processors use the same syntax as `lapply`.
+
+*Note*: There exists yet another `apply` function, `mapply`, that parallelizes multiple arguments of a function at once; so the code above could be simplified to `tbl_list2 <- mapply(cbind, tbl_list, spc_ids)`. Check the `?mapply` help for more details.
+
+### Merging the tables and final fixes
+
+We can append matrices (or data frames) with `rbind`, but that function requires individual matrices as arguments, rather than a list. Fortunately, R has a function, `do.call`, which "unpacks" a list of arguments and passes it to a specified function. Following the merge, we convert to a data frame and add column names.
+```{r}
+tbl_merge <- do.call(rbind, tbl_list2)
+tbl_merge <- data.frame(tbl_merge, stringsAsFactors = FALSE)
+colnames(tbl_merge) <- c("date", "plot_id", "sex", "weight", "species_id")
+head(tbl_merge)
+```
+
+The last steps involve formatting this data to match the *surveys* data frame. 
+
+Fixing the *date* column requires the function `as.Date` and the knowledge of Excel's reference date:
+```{r}
+tbl_merge$date <- as.Date(as.numeric(tbl_merge$date), origin = "1899-12-30")
+```
+
+As for the *weight* column, we first remove any "g" (grams unit) from its contents with the help of the `gsub` (find-replace) function. We then convert it to numeric values. As the warning tells us, all non-numeric elements (which in this case indicate bad measurements) are converted to *NA*.
+```{r}
+tbl_merge$weight <- gsub("g", "", tbl_merge$weight)
+tbl_merge$weight <- as.numeric(tbl_merge$weight)
+```
+
+The *plot_id* column also needs to be converted to integer values:
+```{r}
+tbl_merge$plot_id <- as.integer(tbl_merge$plot_id)
+```
+
+Finally, we create a data frame that exactly matches the columns of *surveys*, adding record IDs that follow in sequence, and extracting the month, day and year from the date column.
+
+```{r}
+last_id <- max(surveys$record_id)
+new_surveys_df <- data.frame(
+    record_id = last_id + 1:nrow(tbl_merge),
+    month = as.numeric(format(tbl_merge$date, "%m")),
+    day = as.numeric(format(tbl_merge$date, "%d")),
+    year = as.numeric(format(tbl_merge$date, "%Y")),
+    plot_id = tbl_merge$plot_id,
+    species_id = tbl_merge$species_id,
+    sex = tbl_merge$sex,
+    hindfoot_length = NA,
+    weight = tbl_merge$weight
+)
+head(new_surveys_df)
+surveys <- rbind(surveys, new_surveys_df)
+```
+
+
+## Additional resources
+
+* In this tutorial, we used some of the standard R functions for processing character strings and dates, but there are specialized R packages, such as [stringr](https://cran.r-project.org/web/packages/stringr/index.html) and [lubridate](https://cran.r-project.org/web/packages/lubridate/index.html), that provide more functionality and/or a simpler interface for working with these types of data.
