@@ -62,7 +62,7 @@ Not all vector functions operate in parallel. Summary functions such as `sum`, `
 Multiple comparisons with *%in%* and *match*
 --------------------------------------------
 
-Using logical subsetting, we can extract all observations of a particular species from the *surveys* data frame, e.g. `surveys[surveys$species_id == "NL", ]`. What if we want to extract all rows corresponding to a specific subset of species? We use the `%in%` operator:
+Using logical subsetting, we can extract all observations of a particular species from the *surveys* data frame, e.g. `surveys[which(surveys$species_id == "NL"), ]`. What if we want to extract all rows corresponding to a specific subset of species? We use the `%in%` operator:
 
 ``` r
 survey_set <- surveys[surveys$species_id %in% c("NL", "DS", "PF"), ]
@@ -88,7 +88,7 @@ species$genus[match(c("NL", "DS", "PF"), species$species_id)]
 
 Note that whereas `x %in% y` returns a logical vector indicating if each element of *x* can be found in *y*, `match(x, y)` returns the index of the first occurrence of each element of `x` within `y`.
 
-**Q.**: What would be the problem with writing `species$genus[species$species_id %in% c("NL", "DS", "PF")]` in the last example? (It would have returned the same three names, but in the order in which they appear in *species*, rather than the order of the codes we provided.)
+**Q.**: What would be the problem with writing `species$genus[species$species_id %in% c("NL", "DS", "PF")` in the last example? (It would have returned the same three names, but in the order in which they appear in *species*, rather than the order of the codes we provided.)
 
 Matrix operations
 -----------------
@@ -163,7 +163,140 @@ names(which(major_plot))
 Data frame operations
 ---------------------
 
-...[order, merge, aggregate, ?]
+Now let's say you want to compute a summary statistic over more specific subsets of your data, you can use the `aggregate` to define the subsets and the summary function. For example, say you wanted to know the mean hindfoot length for each species, you can create a formula where y variables (numeric data) are split by x grouping variables. You can also specify multiple y variables (e.g., hindfoot length and weight) and or multiple x (e.g., species and sex).
+
+``` r
+hindfoot_spp <- aggregate(data = surveys, hindfoot_length ~ species_id, FUN = mean)
+head(hindfoot_spp)
+```
+
+    ##   species_id hindfoot_length
+    ## 1         AH        33.00000
+    ## 2         BA        13.00000
+    ## 3         DM        35.98235
+    ## 4         DO        35.60755
+    ## 5         DS        49.94887
+    ## 6         NL        32.29423
+
+``` r
+lw_spp_sex <- aggregate(data = surveys, cbind(hindfoot_length, weight) ~ species_id + sex, FUN = mean)
+head(lw_spp_sex)
+```
+
+    ##   species_id sex hindfoot_length    weight
+    ## 1         BA   F        13.16129   9.16129
+    ## 2         DM   F        35.71942  41.57354
+    ## 3         DO   F        35.47213  48.54098
+    ## 4         DS   F        49.60878 117.39224
+    ## 5         NL   F        32.01320 154.36964
+    ## 6         OL   F        20.28211  30.78440
+
+Now if you want to sort the data.frame by species name, you can use the `order` function.
+
+``` r
+lw_spp_sex <- lw_spp_sex[order(lw_spp_sex$species_id),]
+head(lw_spp_sex)
+```
+
+    ##    species_id sex hindfoot_length    weight
+    ## 1          BA   F        13.16129  9.161290
+    ## 23         BA   M        12.64286  7.357143
+    ## 2          DM   F        35.71942 41.573536
+    ## 24         DM   M        36.19674 44.324344
+    ## 3          DO   F        35.47213 48.540984
+    ## 25         DO   M        35.67771 49.121019
+
+If you are only interested in observations for which all variables were recorded (there is no missing data). You can use `complete.cases` to return the indices of rows with no NAs and then subset the original data.frame for these rows.
+
+``` r
+surveys_complete <- surveys[complete.cases(surveys),]
+head(surveys_complete)
+```
+
+    ##    record_id month day year plot_id species_id sex hindfoot_length weight
+    ## 63        63     8  19 1977       3         DM   M              35     40
+    ## 64        64     8  19 1977       7         DM   M              37     48
+    ## 65        65     8  19 1977       4         DM   F              34     29
+    ## 66        66     8  19 1977       4         DM   F              35     46
+    ## 67        67     8  19 1977       7         DM   M              35     36
+    ## 68        68     8  19 1977       8         DO   F              32     52
+
+**Q.**: How many incomplete cases were in the original surveys dataset?
+
+The `unique` function is also useful when you want to remove duplicate elements/rows or summarize the unique combinations of variables
+
+``` r
+sampling_dates <- unique(surveys[,c("month", "day", "year")])
+head(sampling_dates)
+```
+
+    ##     month day year
+    ## 1       7  16 1977
+    ## 20      7  17 1977
+    ## 40      7  18 1977
+    ## 63      8  19 1977
+    ## 83      8  20 1977
+    ## 114     8  21 1977
+
+The `merge` function lets you combine data.frames based on a common column. For example, say you wanted to combine the information on plot type from the plots data.frame with the raw surveys data, you can merge the two columns based on the `plot_id` column. The common column must either have the same name in both data.frames or you can specific the unique names in each with the `by.x` and `by.y` arguments.
+
+``` r
+merged_surveys <- merge(surveys, plots, by = "plot_id")
+head(merged_surveys)
+```
+
+    ##   plot_id record_id month day year species_id  sex hindfoot_length weight
+    ## 1       1     30429     3   4 2000         PP    F              22     17
+    ## 2       1     33950     5  15 2002         NL    M              30    205
+    ## 3       1      5669     3  30 1982         DM    M              36     46
+    ## 4       1      2947     5  17 1980         DS    M              48    102
+    ## 5       1      9891     1  20 1985         AH <NA>              NA     NA
+    ## 6       1     31375     9  30 2000         DO    M              33     50
+    ##           plot_type
+    ## 1 Spectab exclosure
+    ## 2 Spectab exclosure
+    ## 3 Spectab exclosure
+    ## 4 Spectab exclosure
+    ## 5 Spectab exclosure
+    ## 6 Spectab exclosure
+
+Finally, there are some helpful functions in the `reshape2` package for massaging data.frames in different ways. The `melt` function allows you to put each unique id-variable combination in its own row. The `cast` functions (`dcast` for data.frames in `reshape2`) lets you move the melted data into any shape you like. Say we wanted to use the tabulated count data for each species\*plot combination, but wanted each count in its own row, we can use the melt function to accomplish this. Using the `dcast` function, we can "put the data back".
+
+``` r
+library(reshape2)
+counts_melt <- melt(counts_mat)
+colnames(counts_melt) <- c("species_id", "plot_id", "count")
+head(counts_melt)
+```
+
+    ##   species_id plot_id count
+    ## 1         AB       1     7
+    ## 2         AH       1     7
+    ## 3         AS       1     0
+    ## 4         BA       1     1
+    ## 5         CB       1     0
+    ## 6         CM       1     0
+
+``` r
+counts_cast <- dcast(counts_melt, species_id ~ plot_id)
+```
+
+    ## Using count as value column: use value.var to override.
+
+``` r
+counts_cast[1:5,1:5]
+```
+
+    ##   species_id 1  2  3 4
+    ## 1         AB 7 14 10 3
+    ## 2         AH 7  7  2 2
+    ## 3         AS 0  0  0 0
+    ## 4         BA 1  1 19 0
+    ## 5         CB 0  0  1 1
+
+### Exercise
+
+-   Which three genera have the largest mean hindfoot lengths?
 
 Additional resources
 --------------------
