@@ -29,7 +29,7 @@ messy_data <- read_excel("/nfs/public-data/portal-teachingdb/survey_data_spreads
                          sheet = 1, col_names = FALSE)
 ```
 
-By inspecting the resulting data frame, we can identify several ways in which the data needs cleaning:
+**Q.**: Why does this data need cleaning? Why is it difficult to work with it in its current form?
 
 -   it is separated in multiple tables (one by species);
 -   the weights are not reported consistently;
@@ -69,7 +69,7 @@ spc_ids <- substr(header_text, nchar(header_text) - 1, nchar(header_text))
 
 ### Storing matrices in a list
 
-Let's assume we know that each species table has four columns corresponding to the date collected, plot ID, sex and weight; and that the table has ended when we reach a row with four empty cells. Given the position of the header and the data matrix *dmat*, this function returns the data table (minus column headers) as a matrix:
+Let's assume we know that each species table has four columns corresponding to the date collected, plot ID, sex and weight; and that the table has ended when we reach a row with four empty cells. Given the position of the header and the data matrix *dmat*, we create a function that returns the data table (minus column headers) as a matrix:
 
 ``` r
 # This function extracts a four column data table from the matrix dmat
@@ -81,7 +81,9 @@ get_spc_table <- function(hdr_idx, dmat) {
 }
 ```
 
-We now `apply` this function to each row of our `header_ind` matrix to extract the table for that species. The output in this case is a list of matrices:
+**Q.**: Starting from our matrix of indices `header_ind`, how can we can we extract the table for each species in one line of code?
+
+We `apply` the function above to each row of our `header_ind` matrix. The output in this case is a list of matrices:
 
 ``` r
 tbl_list <- apply(header_ind, 1, get_spc_table, dmat = messy_data)
